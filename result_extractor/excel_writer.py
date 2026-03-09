@@ -1,11 +1,172 @@
 """Write table data to XLSX with configurable column order."""
 
+import re
+from datetime import date, datetime
 from pathlib import Path
 
+import pandas as pd
 from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from .config import OUTPUT_COLUMN_ORDER, OUTPUT_SHEET_NAME
+
+
+def _brazilian_to_numeric(ser: pd.Series) -> pd.Series:
+    """
+    Convert a pandas Series from Brazilian number strings to numeric (2 decimals).
+    Brazilian: comma = decimal (reais, centavos), dot = thousands. Uses re for cleanup.
+    """
+    def one_cell(val):
+        if val is None or (isinstance(val, str) and not str(val).strip()):
+            return val
+        if isinstance(val, (int, float)):
+            return round(float(val), 2) if isinstance(val, float) else val
+        s = re.sub(r"R\$\s*", "", str(val), flags=re.I)
+        s = re.sub(r"[\s\u00a0]", "", s)
+        s = s.strip()
+        if not s:
+            return val
+        # Brazilian: comma = decimal, dot = thousands
+        if "," in s:
+            parts = re.split(r",", s, maxsplit=1)
+            int_str = re.sub(r"\.", "", parts[0].strip())
+            dec_str = (parts[1].strip() + "00")[:2]
+            if re.match(r"^-?\d+$", int_str) and re.match(r"^\d{1,2}$", dec_str):
+                try:
+                    sign = -1 if int_str.startswith("-") else 1
+                    return round(sign * (abs(int(int_str)) + int(dec_str) / 100.0), 2)
+                except ValueError:
+                    pass
+        if "." in s and "," not in s:
+            try:
+                return int(re.sub(r"\.", "", s))
+            except ValueError:
+                pass
+        if re.match(r"^-?\d+$", re.sub(r"\.", "", s)):
+            try:
+                return int(re.sub(r"\.", "", s))
+            except ValueError:
+                pass
+        return val
+
+    return ser.apply(one_cell)
+
+
+def _convert_table_brazilian_pandas(
+    table_part: list[list],
+    venci_col_0based: int | None,
+) -> list[list]:
+    """
+    Use pandas + re to convert table rows: Brazilian numbers → float (2 decimals).
+    Returns list of rows (header + data) ready for Excel; VENCIMENTO column left as-is for date parsing.
+    """
+    if not table_part or len(table_part) < 2:
+        return table_part
+    header = table_part[0]
+    df = pd.DataFrame(table_part[1:], columns=header)
+    for col_idx, col_name in enumerate(header):
+        if venci_col_0based is not None and col_idx == venci_col_0based:
+            continue
+        df[col_name] = _brazilian_to_numeric(df[col_name])
+    # Back to list of rows; convert numpy types to Python for openpyxl
+    out = [list(df.columns)]
+    for _, row in df.iterrows():
+        out.append([_pyval(x) for x in row.tolist()])
+    return out
+
+
+def _pyval(x) -> str | int | float | date:
+    """Convert numpy/pandas value to Python type for openpyxl."""
+    if pd.isna(x):
+        return ""
+    if hasattr(x, "item"):
+        return x.item()
+    return x
+
+
+def _to_number(value: str) -> int | float | str:
+    """
+    Parse as Brazilian number: comma = decimal (reais, centavos), dot = thousands.
+    E.g. 36,89 = 36 reais and 89 centavos → 36.89. Always returns at most 2 decimal places.
+    """
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return value if value is not None else ""
+    s = str(value).strip()
+    if not s:
+        return s
+    # Already numeric – round floats to 2 decimals
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return round(value, 2)
+    # Strip R$ and spaces
+    normalized = re.sub(r"^R\$\s*", "", s, flags=re.IGNORECASE)
+    normalized = "".join(c for c in normalized if c not in " \u00a0\t").strip()
+    if not normalized:
+        return s
+    # Keep only digits, one comma, dots, minus
+    only_nums = "".join(c for c in normalized if c in "0123456789,.-")
+    if not only_nums:
+        return s
+    # Brazilian rule: comma = decimal separator (centavos), dot = thousands
+    if "," in only_nums:
+        # One comma: part before = integer (remove dots), part after = decimals (max 2)
+        parts = only_nums.split(",", 1)
+        int_part = parts[0].replace(".", "").strip()
+        dec_part = (parts[1].strip() + "00")[:2]  # at most 2 digits (centavos)
+        if not int_part.lstrip("-").isdigit() or not dec_part.isdigit():
+            return s
+        try:
+            sign = -1 if int_part.startswith("-") else 1
+            num = abs(int(int_part)) + int(dec_part) / 100.0
+            return round(sign * num, 2)
+        except ValueError:
+            return s
+    # No comma: dot = thousands (e.g. 1.200) or plain integer
+    no_dots = only_nums.replace(".", "")
+    if no_dots.lstrip("-").isdigit():
+        try:
+            return int(no_dots)
+        except ValueError:
+            pass
+    return s
+
+
+def _parse_date(value: str) -> date | str:
+    """Parse date string to datetime for Excel; Brazilian DD/MM/AAAA preferred. Returns original string if not parseable."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return value if value is not None else ""
+    s = str(value).strip()
+    if not s:
+        return s
+    if hasattr(value, "year"):  # already a date/datetime
+        return value
+    formats = ["%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d", "%d-%m-%Y", "%d-%m-%y"]
+    for fmt in formats:
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
+    return s
+
+
+def _autofit_columns(ws: Worksheet, padding: int = 2, max_width: int = 80) -> None:
+    """Set column widths so content fits; avoid cut text. Uses max of cell lengths per column."""
+    if ws.max_row == 0 or ws.max_column == 0:
+        return
+    for col_idx in range(1, ws.max_column + 1):
+        width = 0
+        for row_idx in range(1, ws.max_row + 1):
+            cell = ws.cell(row=row_idx, column=col_idx)
+            val = cell.value
+            if val is not None:
+                length = len(str(val).strip())
+                if length > width:
+                    width = length
+        if width > 0:
+            width = min(width + padding, max_width)
+            ws.column_dimensions[get_column_letter(col_idx)].width = width
 
 
 def reorder_columns(
@@ -149,9 +310,40 @@ def write_spreadsheet(
             ws.append([row[0], row[1]])
     ws.append([])  # blank row
 
-    # Table
-    for row in table_part:
-        ws.append(row)
+    # Find VENCIMENTO column (0-based) for date formatting
+    header_row = table_part[0] if table_part else []
+    venci_col_0based = next(
+        (i for i, h in enumerate(header_row) if str(h).strip().upper() == "VENCIMENTO"),
+        None,
+    )
 
+    # Convert table with pandas + re: Brazilian numbers → float (2 decimals)
+    table_part = _convert_table_brazilian_pandas(table_part, venci_col_0based)
+
+    # Table: write row by row, cell by cell; numbers as numeric with exactly 2 decimals (Brazilian)
+    table_start_row = ws.max_row + 1
+    for row_offset, row in enumerate(table_part):
+        row_idx = table_start_row + row_offset
+        for col_idx, cell in enumerate(row, start=1):
+            c = ws.cell(row=row_idx, column=col_idx)
+            if venci_col_0based is not None and (col_idx - 1) == venci_col_0based:
+                val = _parse_date(cell)
+                c.value = val
+                if isinstance(val, date):
+                    c.number_format = "dd/mm/yyyy"
+            else:
+                # Cell from pandas (float 2 decimals) or still string – ensure we write a number when possible
+                if isinstance(cell, float):
+                    val = round(cell, 2)
+                elif isinstance(cell, int):
+                    val = cell
+                else:
+                    val = _to_number(cell)  # fallback: parse Brazilian string (e.g. "260,000" → 260.0)
+                c.value = val
+                if isinstance(val, (int, float)):
+                    # Force exactly 2 decimal places in display (Excel format 0.00)
+                    c.number_format = "0.00"
+
+    _autofit_columns(ws)
     wb.save(path)
     return path.resolve()

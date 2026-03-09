@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from .config import HAS_HEADER_ROW, OUTPUT_COLUMN_ORDER
+from .config import COLUMNS_TO_EXCLUDE, HAS_HEADER_ROW, OUTPUT_COLUMN_ORDER
 from .excel_writer import write_xlsx, write_spreadsheet
 from .pdf_reader import extract_tables, extract_header_and_tables
 
@@ -97,17 +97,25 @@ def convert_pdf_to_spreadsheet(
                 for row in t[data_start:]:
                     combined_table_rows.append(row)
 
-    # 3) Output path and options
+    order = column_order if column_order is not None else OUTPUT_COLUMN_ORDER
+    header_flag = has_header if has_header is not None else HAS_HEADER_ROW
+
+    # 3) Drop excluded columns (TÍTULO, ATRASO)
+    if combined_table_rows and COLUMNS_TO_EXCLUDE and header_flag:
+        header_row = combined_table_rows[0]
+        exclude_set = {c.strip() for c in COLUMNS_TO_EXCLUDE}
+        keep_indices = [i for i, h in enumerate(header_row) if str(h).strip() not in exclude_set]
+        combined_table_rows = [[(row[i] if i < len(row) else "") for i in keep_indices] for row in combined_table_rows]
+
+    # 4) Output path and options
     if output_dir is None:
         output_dir = Path.home() / "Desktop"
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     out_path = output_dir / f"exported_{timestamp}.xlsx"
-    order = column_order if column_order is not None else OUTPUT_COLUMN_ORDER
-    header_flag = has_header if has_header is not None else HAS_HEADER_ROW
 
-    # 4) Write once, outside any page loop
+    # 5) Write once, outside any page loop
     return write_spreadsheet(
         all_header_rows,
         combined_table_rows,

@@ -1,9 +1,21 @@
 """Extract table data and header (personal data) from PDF files."""
 
 import re
+from decimal import Decimal
 from pathlib import Path
 
 import pdfplumber
+
+
+def _normalize_cell(cell) -> str:
+    """Convert a table cell to string; round floats/Decimals to 2 decimals at extraction time."""
+    if cell is None:
+        return ""
+    if isinstance(cell, int):
+        return str(cell)
+    if isinstance(cell, (float, Decimal)):
+        return str(round(float(cell), 2))
+    return str(cell).strip()
 
 
 def _find_pagina_markers(page) -> list[tuple[float, float, int]]:
@@ -97,10 +109,7 @@ def _extract_from_one_logical_page(cropped_page, logical_page_num: int) -> tuple
             for field, value in pairs:
                 header_rows.append((logical_page_num, field, value))
         for table in cropped_page.extract_tables():
-            normalized = [
-                [str(cell).strip() if cell is not None else "" for cell in row]
-                for row in table
-            ]
+            normalized = [[_normalize_cell(cell) for cell in row] for row in table]
             if normalized:
                 tables.append(normalized)
     else:
@@ -109,10 +118,7 @@ def _extract_from_one_logical_page(cropped_page, logical_page_num: int) -> tuple
         for field, value in pairs:
             header_rows.append((logical_page_num, field, value))
         for table in cropped_page.extract_tables():
-            normalized = [
-                [str(cell).strip() if cell is not None else "" for cell in row]
-                for row in table
-            ]
+            normalized = [[_normalize_cell(cell) for cell in row] for row in table]
             if normalized:
                 tables.append(normalized)
     return header_rows, tables
@@ -179,11 +185,7 @@ def extract_tables(pdf_path: str | Path) -> list[list[list[str]]]:
             page_tables = page.extract_tables()
             if page_tables:
                 for table in page_tables:
-                    # Normalize: ensure every cell is str, empty cells as ""
-                    normalized = [
-                        [str(cell).strip() if cell is not None else "" for cell in row]
-                        for row in table
-                    ]
+                    normalized = [[_normalize_cell(cell) for cell in row] for row in table]
                     if normalized:
                         tables.append(normalized)
     return tables

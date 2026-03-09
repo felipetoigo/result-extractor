@@ -19,3 +19,7 @@ HAS_HEADER_ROW: bool = True
 
 # Sheet name in the output workbook.
 OUTPUT_SHEET_NAME: str = "Results"
+
+# Table columns to exclude from the exported XLSX (header and data).
+# Matching is case-sensitive after stripping.
+COLUMNS_TO_EXCLUDE: list[str] = ["TÍTULO", "ATRASO"]
