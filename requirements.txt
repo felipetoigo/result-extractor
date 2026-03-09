@@ -1,0 +1,11 @@
+# PDF table extraction
+pdfplumber>=0.11.0
+
+# Excel output
+openpyxl>=3.1.0
+
+# CLI
+# (stdlib: argparse)
+
+# For building executables (install when needed)
+# pyinstaller>=6.0.0
