@@ -314,16 +314,16 @@ def write_spreadsheet(
     ws: Worksheet = wb.active
     ws.title = name[:31]
 
-    # Header section: with page numbers (Page | Field | Value) or plain (Field | Value)
-    if header_rows and isinstance(header_rows[0][0], int):
-        ws.append(["Page", "Field", "Value"])
-        for row in header_rows:
-            ws.append([row[0], row[1], row[2]])
-    else:
-        ws.append(["Field", "Value"])
-        for row in header_rows:
-            ws.append([row[0], row[1]])
-    ws.append([])  # blank row
+    # Header section: Field and Value only (no "Page" column, no "Field"/"Value" header row)
+    if header_rows:
+        if isinstance(header_rows[0][0], int):
+            for row in header_rows:
+                ws.append([row[1], row[2]])  # field, value (skip page)
+        else:
+            for row in header_rows:
+                ws.append([row[0], row[1]])
+    # Blank row to separate header from table (use [""] so openpyxl creates a real row)
+    ws.append([""])
 
     # Find VENCIMENTO column (0-based) for date formatting
     header_row = table_part[0] if table_part else []
