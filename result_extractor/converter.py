@@ -153,6 +153,26 @@ def _rename_header_columns(rows: list[list], renames: dict[str, str]) -> list[li
     return [header] + list(rows[1:])
 
 
+def _fill_column_with_value(rows: list[list], column_name: str, value: str) -> list[list]:
+    """
+    Set all data rows (below the header) in the given column to value.
+    Column is found by normalized header match. Overwrites existing values.
+    """
+    if not rows or len(rows) < 2:
+        return rows
+    header = rows[0]
+    idx = _find_header_index(header, column_name, exact=False)
+    if idx is None:
+        return rows
+    result = [list(header)]
+    for row in rows[1:]:
+        new_row = list(row)
+        if idx < len(new_row):
+            new_row[idx] = value
+        result.append(new_row)
+    return result
+
+
 def _drop_columns(rows: list[list], column_names: list[str]) -> list[list]:
     """
     Remove columns by header name (normalized match). Keeps all other columns in order.
@@ -299,7 +319,10 @@ def convert_pdf_to_spreadsheet(
         {"VCM": "VALOR CORRIGIDO", "HR": "TAXAS RESULT", "HA": "HONORÁRIOS ADVOCATÍCIOS"},
     )
 
-    # 9) Output path and options
+    # 9) Fill ESPÉCIE column with "Cota" for all data rows (overwrite any value from PDF)
+    combined_table_rows = _fill_column_with_value(combined_table_rows, "ESPÉCIE", "Cota")
+
+    # 10) Output path and options
     if output_dir is None:
         output_dir = Path.home() / "Desktop"
     output_dir = Path(output_dir)
@@ -307,7 +330,7 @@ def convert_pdf_to_spreadsheet(
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     out_path = output_dir / f"exported_{timestamp}.xlsx"
 
-    # 10) Write once, outside any page loop
+    # 11) Write once, outside any page loop
     return write_spreadsheet(
         all_header_rows,
         combined_table_rows,
