@@ -174,9 +174,11 @@ def _parse_date(value: str) -> date | str:
 
 
 def _autofit_columns(ws: Worksheet, padding: int = 2, max_width: int = 80) -> None:
-    """Set column widths so content fits; avoid cut text. For wrap_text cells use max line length per column."""
+    """Set column widths so content fits; avoid cut text. For wrap_text cells use max line length.
+    Column A: fit to the longest first word. Currency (R$)-formatted cells get extra width for the prefix."""
     if ws.max_row == 0 or ws.max_column == 0:
         return
+    _CURRENCY_PADDING = 5  # extra width for "R$ " and thousands separator in display
     for col_idx in range(1, ws.max_column + 1):
         width = 0
         for row_idx in range(1, ws.max_row + 1):
@@ -184,10 +186,17 @@ def _autofit_columns(ws: Worksheet, padding: int = 2, max_width: int = 80) -> No
             val = cell.value
             if val is not None:
                 s = str(val).strip()
-                if "\n" in s:
+                if col_idx == 1:
+                    # Column A: fit to the first word only (longest first word in column)
+                    parts = s.split()
+                    first_word = parts[0] if parts else s
+                    length = len(first_word)
+                elif "\n" in s:
                     length = max(len(line) for line in s.splitlines()) if s else 0
                 else:
                     length = len(s)
+                if cell.number_format and "R$" in str(cell.number_format):
+                    length += _CURRENCY_PADDING
                 if length > width:
                     width = length
         if width > 0:
@@ -341,14 +350,26 @@ def write_spreadsheet(
         else:
             for row in header_rows:
                 ws.append([row[0], row[1]])
-        # Merge cells B to I on each header row (line level only)
+        # Merge cells B to E on each header row (line level only); column F left as is
         for row_idx in range(header_section_start, header_section_start + len(header_rows)):
             ws.merge_cells(
                 start_row=row_idx,
                 start_column=2,
                 end_row=row_idx,
-                end_column=9,
+                end_column=5,
             )
+    # Fixed table to the right of column F: rows 1-5, labels in merged G:H, values in I
+    _FIXED_TABLE_ROWS = [
+        ("Correção monetária", "INPC"),
+        ("Multa moratória", "2%"),
+        ("Juros moratórios (mensal)", "1%"),
+        ("Result Cobranças", "20%"),
+        ("Honorários Advocatícios", "20%"),
+    ]
+    for row_idx, (label, value) in enumerate(_FIXED_TABLE_ROWS, start=1):
+        ws.cell(row=row_idx, column=7).value = label
+        ws.merge_cells(start_row=row_idx, start_column=7, end_row=row_idx, end_column=8)
+        ws.cell(row=row_idx, column=9).value = value
     # Blank row to separate header from table (use [""] so openpyxl creates a real row)
     ws.append([""])
 
@@ -356,12 +377,19 @@ def write_spreadsheet(
     if header_rows:
         num_header_rows = len(header_rows)
         for row_idx in range(header_section_start, header_section_start + num_header_rows):
-            for col_idx in range(1, 10):  # A through I (merged B:I)
+            for col_idx in range(1, 10):  # A through I (F left as is, G-I fixed table)
                 c = ws.cell(row=row_idx, column=col_idx)
                 c.border = _THIN_BORDER
                 if col_idx == 1:
                     c.font = _BOLD_FONT
                     c.fill = _LIGHT_GRAY_FILL
+    # Fixed table (rows 1-5, G:H merged label, I value): borders + bold on label
+    for row_idx in range(1, 6):
+        for col_idx in (7, 8, 9):
+            c = ws.cell(row=row_idx, column=col_idx)
+            c.border = _THIN_BORDER
+            if col_idx == 7:
+                c.font = _BOLD_FONT
 
     # Find VENCIMENTO column (0-based) for date formatting; identify monetary columns for R$ format
     header_row = table_part[0] if table_part else []
@@ -429,24 +457,6 @@ def write_spreadsheet(
                 c.fill = _LIGHT_GRAY_FILL
                 if col_idx == 1:
                     c.value = "TOTAIS"
-
-    # Second table: one blank row below main table, then fixed 5x2 table (columns A and B)
-    _SECOND_TABLE_ROWS = [
-        ("Correção monetária", "INPC"),
-        ("Multa moratória", "2%"),
-        ("Juros Moratórios (mensal)", "1%"),
-        ("Result cobranças", "20%"),
-        ("Honorários Advocatícios", "20%"),
-    ]
-    second_table_start_row = table_start_row + num_table_rows + 1
-    for i, (label, value) in enumerate(_SECOND_TABLE_ROWS):
-        row_idx = second_table_start_row + i
-        for col_idx, val in enumerate((label, value), start=1):
-            c = ws.cell(row=row_idx, column=col_idx)
-            c.value = val
-            c.border = _THIN_BORDER
-            if col_idx == 1:
-                c.font = _BOLD_FONT
 
     _autofit_columns(ws)
     # Column B (VENCIMENTO): fit the header "VENCIMENTO" when bold
