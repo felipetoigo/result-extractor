@@ -332,10 +332,10 @@ def convert_pdf_to_spreadsheet(
         ["HONORÁRIOS", "CORREÇÃO MONETÁRIA", "Correção"],
     )
 
-    # 9) Rename header for display only: VCM -> VALOR CORRIGIDO, HR -> TAXAS RESULT, HA -> HONORÁRIOS\nADMINISTRATIVOS (two lines)
+    # 9) Rename header for display only: VCM -> VALOR CORRIGIDO, HR -> TAXAS RESULT, HA -> HONORÁRIOS\nADVOCATÍCIOS (two lines)
     combined_table_rows = _rename_header_columns(
         combined_table_rows,
-        {"VCM": "VALOR CORRIGIDO", "HR": "TAXAS RESULT", "HA": "HONORÁRIOS\nADMINISTRATIVOS"},
+        {"VCM": "VALOR CORRIGIDO", "HR": "TAXAS RESULT", "HA": "HONORÁRIOS\nADVOCATÍCIOS"},
     )
 
     # 10) Fill ESPÉCIE column with "Cota" for all data rows (overwrite any value from PDF)

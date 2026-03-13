@@ -416,18 +416,36 @@ def write_spreadsheet(
                 if col_idx == 1:
                     c.value = "TOTAIS"
 
+    # Second table: one blank row below main table, then fixed 5x2 table (columns A and B)
+    _SECOND_TABLE_ROWS = [
+        ("Correção monetária", "INPC"),
+        ("Multa moratória", "2%"),
+        ("Juros Moratórios (mensal)", "1%"),
+        ("Result cobranças", "20%"),
+        ("Honorários Advocatícios", "20%"),
+    ]
+    second_table_start_row = table_start_row + num_table_rows + 1
+    for i, (label, value) in enumerate(_SECOND_TABLE_ROWS):
+        row_idx = second_table_start_row + i
+        for col_idx, val in enumerate((label, value), start=1):
+            c = ws.cell(row=row_idx, column=col_idx)
+            c.value = val
+            c.border = _THIN_BORDER
+            if col_idx == 1:
+                c.font = _BOLD_FONT
+
     _autofit_columns(ws)
     # Column B (VENCIMENTO): fit the header "VENCIMENTO" when bold
     ws.column_dimensions["B"].width = len("VENCIMENTO") + 3
-    # Column H (HONORÁRIOS ADMINISTRATIVOS): slightly wider so "ADMINISTRATIVOS" stays on one line (avoid "S" on third line)
+    # Column H (HONORÁRIOS ADVOCATÍCIOS): slightly wider so "ADVOCATÍCIOS" stays on one line (avoid "S" on third line)
     hon_col_idx = next(
-        (i + 1 for i, h in enumerate(header_row) if isinstance(h, str) and "ADMINISTRATIVOS" in h),
+        (i + 1 for i, h in enumerate(header_row) if isinstance(h, str) and "ADVOCATÍCIOS" in h),
         8,
     )
     hon_letter = get_column_letter(hon_col_idx)
     ws.column_dimensions[hon_letter].width = max(
         ws.column_dimensions[hon_letter].width or 0,
-        len("ADMINISTRATIVOS") + 4,
+        len("ADVOCATÍCIOS") + 4,
     )
     wb.save(path)
     return path.resolve()
