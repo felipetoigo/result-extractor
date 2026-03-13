@@ -6,6 +6,22 @@ from pathlib import Path
 
 from .config import COLUMNS_TO_EXCLUDE, HAS_HEADER_ROW, OUTPUT_COLUMN_ORDER
 
+# Brazilian date pattern in header (e.g. "Joinville, 09 de Março de 2026" or "09 de Março de 2026")
+_DATE_HEADER_PATTERN = re.compile(
+    r"\d{1,2}\s+de\s+\w+\s+de\s+\d{4}",
+    re.IGNORECASE,
+)
+
+
+def _is_date_header_row(row: tuple) -> bool:
+    """True if this header row is only a date line (e.g. 'Joinville, 09 de Março de 2026')."""
+    if len(row) == 3:
+        _, field, value = row
+    else:
+        field, value = row[0], row[1]
+    text = f"{field} {value}".strip()
+    return bool(_DATE_HEADER_PATTERN.search(text))
+
 
 def _normalize_header(name: str) -> str:
     """Normalize header for comparison: strip, collapse spaces, uppercase, remove accents (e.g. CORREÇÃO → CORRECAO)."""
@@ -268,7 +284,10 @@ def convert_pdf_to_spreadsheet(
     # 1) Extract everything into two lists (reader only appends)
     all_header_rows, all_tables = extract_header_and_tables(pdf_path)
 
-    # 2) Build one combined list of table rows from all tables (append only)
+    # 2) Drop header rows that are only a date line (e.g. "Joinville, 09 de Março de 2026") so first line is customer data
+    all_header_rows = [r for r in all_header_rows if not _is_date_header_row(r)]
+
+    # 3) Build one combined list of table rows from all tables (append only)
     combined_table_rows: list[list[str]] = []
     if all_tables:
         first_header = all_tables[0][0] if (HAS_HEADER_ROW and all_tables[0]) else []
@@ -284,14 +303,14 @@ def convert_pdf_to_spreadsheet(
     order = column_order if column_order is not None else OUTPUT_COLUMN_ORDER
     header_flag = has_header if has_header is not None else HAS_HEADER_ROW
 
-    # 3) Drop excluded columns (TÍTULO, ATRASO)
+    # 4) Drop excluded columns (TÍTULO, ATRASO)
     if combined_table_rows and COLUMNS_TO_EXCLUDE and header_flag:
         header_row = combined_table_rows[0]
         exclude_set = {c.strip() for c in COLUMNS_TO_EXCLUDE}
         keep_indices = [i for i, h in enumerate(header_row) if str(h).strip() not in exclude_set]
         combined_table_rows = [[(row[i] if i < len(row) else "") for i in keep_indices] for row in combined_table_rows]
 
-    # 4) Add blank columns VCM (after CORREÇÃO MONETÁRIA / Correção or VALOR), HR (after HONORÁRIOS), HA (after HR)
+    # 5) Add blank columns VCM (after CORREÇÃO MONETÁRIA / Correção or VALOR), HR (after HONORÁRIOS), HA (after HR)
     combined_table_rows = _add_blank_columns(
         combined_table_rows,
         [
@@ -301,28 +320,28 @@ def convert_pdf_to_spreadsheet(
         ],
     )
 
-    # 5) Fill VCM column: VCM = VALOR + CORREÇÃO MONETÁRIA for each data row
+    # 6) Fill VCM column: VCM = VALOR + CORREÇÃO MONETÁRIA for each data row
     combined_table_rows = _fill_vcm_column(combined_table_rows)
 
-    # 6) Fill HR and HA columns: 20% of (VCM + JUROS + MULTA) for each data row
+    # 7) Fill HR and HA columns: 20% of (VCM + JUROS + MULTA) for each data row
     combined_table_rows = _fill_hr_ha_columns(combined_table_rows)
 
-    # 7) Drop HONORÁRIOS and CORREÇÃO MONETÁRIA columns (after all calculations)
+    # 8) Drop HONORÁRIOS and CORREÇÃO MONETÁRIA columns (after all calculations)
     combined_table_rows = _drop_columns(
         combined_table_rows,
         ["HONORÁRIOS", "CORREÇÃO MONETÁRIA", "Correção"],
     )
 
-    # 8) Rename header for display only: VCM -> VALOR CORRIGIDO, HR -> TAXAS RESULT, HA -> HONORÁRIOS\nADMINISTRATIVOS (two lines)
+    # 9) Rename header for display only: VCM -> VALOR CORRIGIDO, HR -> TAXAS RESULT, HA -> HONORÁRIOS\nADMINISTRATIVOS (two lines)
     combined_table_rows = _rename_header_columns(
         combined_table_rows,
         {"VCM": "VALOR CORRIGIDO", "HR": "TAXAS RESULT", "HA": "HONORÁRIOS\nADMINISTRATIVOS"},
     )
 
-    # 9) Fill ESPÉCIE column with "Cota" for all data rows (overwrite any value from PDF)
+    # 10) Fill ESPÉCIE column with "Cota" for all data rows (overwrite any value from PDF)
     combined_table_rows = _fill_column_with_value(combined_table_rows, "ESPÉCIE", "Cota")
 
-    # 10) Output path and options
+    # 11) Output path and options
     if output_dir is None:
         output_dir = Path.home() / "Desktop"
     output_dir = Path(output_dir)
@@ -330,7 +349,7 @@ def convert_pdf_to_spreadsheet(
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     out_path = output_dir / f"exported_{timestamp}.xlsx"
 
-    # 11) Write once, outside any page loop
+    # 12) Write once, outside any page loop
     return write_spreadsheet(
         all_header_rows,
         combined_table_rows,

@@ -410,8 +410,6 @@ def write_spreadsheet(
                 c.fill = _LIGHT_GRAY_FILL
 
     _autofit_columns(ws)
-    # Column A: fit bolded date "Joinville, 09 de Março de 2026" (header section)
-    ws.column_dimensions["A"].width = len("Joinville, 09 de Março de 2026") + 3
     # Column B (VENCIMENTO): fit the header "VENCIMENTO" when bold
     ws.column_dimensions["B"].width = len("VENCIMENTO") + 3
     # Column H (HONORÁRIOS ADMINISTRATIVOS): slightly wider so "ADMINISTRATIVOS" stays on one line (avoid "S" on third line)
