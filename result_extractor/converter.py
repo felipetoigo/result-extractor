@@ -339,7 +339,7 @@ def convert_pdf_to_spreadsheet(
     )
 
     # 10) Fill ESPÉCIE column with "Cota" for all data rows (overwrite any value from PDF)
-    combined_table_rows = _fill_column_with_value(combined_table_rows, "ESPÉCIE", "Cota")
+    combined_table_rows = _fill_column_with_value(combined_table_rows, "ESPÉCIE", "COTA")
 
     # 11) Output path and options
     if output_dir is None:

@@ -63,7 +63,7 @@ def main() -> None:
 
     btn = tk.Button(
         frame,
-        text="Import and Convert",
+        text="Importar e Converter",
         command=import_and_convert,
         font=("", 12),
         padx=20,
