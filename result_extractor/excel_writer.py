@@ -1,6 +1,7 @@
 """Write table data to XLSX with configurable column order."""
 
 import re
+import unicodedata
 from datetime import date, datetime
 from pathlib import Path
 
@@ -10,6 +11,13 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from .config import OUTPUT_COLUMN_ORDER, OUTPUT_SHEET_NAME
+
+
+def _normalize_header(name: str) -> str:
+    """Normalize header for comparison: strip, collapse spaces, uppercase, remove accents (e.g. CORREÇÃO → CORRECAO)."""
+    s = re.sub(r"\s+", " ", str(name).strip()).upper()
+    nfd = unicodedata.normalize("NFD", s)
+    return "".join(c for c in nfd if unicodedata.category(c) != "Mn")
 
 
 def _brazilian_to_numeric(ser: pd.Series) -> pd.Series:
@@ -203,16 +211,23 @@ def reorder_columns(
         # Indices: assume column_order is list of 0-based indices
         index_map = list(column_order)
     else:
-        # Header names: find index for each name in the header
+        # Header names: find index for each name (normalized match so PDF "Correção Monetária" matches config "CORREÇÃO MONETÁRIA")
         if not header:
             return rows
-        name_to_index = {str(h).strip(): i for i, h in enumerate(header)}
+        normalized_to_index = {}
+        for i, h in enumerate(header):
+            key = _normalize_header(str(h).strip())
+            if key not in normalized_to_index:
+                normalized_to_index[key] = i
         index_map = []
         for name in column_order:
-            idx = name_to_index.get(str(name).strip())
+            norm_name = _normalize_header(str(name).strip())
+            idx = normalized_to_index.get(norm_name)
+            # Fallback: PDF may have "Correção" only (normalizes to "CORRECAO") for CORREÇÃO MONETÁRIA
+            if idx is None and norm_name == "CORRECAO MONETARIA":
+                idx = normalized_to_index.get("CORRECAO")
             if idx is not None:
                 index_map.append(idx)
-            # If name not in header, we could append empty column; for now skip
 
     def reorder_row(row: list[str]) -> list[str]:
         return [row[i] if i < len(row) else "" for i in index_map]

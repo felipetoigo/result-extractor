@@ -10,8 +10,17 @@ Excel column order. Use the exact header names as they appear in the PDF
 # Update this list when you have the PDF: use the PDF's column headers (strings)
 # or 0-based indices (integers). Example: ["Name", "Date", "Result"] or [0, 2, 1]
 OUTPUT_COLUMN_ORDER: list[str] | list[int] = [
-    # Placeholder: add your column names or indices after you have the PDF.
-    # Example: "Column A", "Column B", "Column C"
+    "ESPÉCIE",
+    "VENCIMENTO",
+    "VALOR",
+    "CORREÇÃO MONETÁRIA",
+    "VCM",
+    "JUROS",
+    "MULTA",
+    "HONORÁRIOS",
+    "HR",
+    "HA",
+    "TOTAL",
 ]
 
 # If the PDF has no header row, set to False and we'll use column indices.
