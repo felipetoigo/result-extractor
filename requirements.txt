@@ -8,5 +8,5 @@ pandas>=2.0.0
 # CLI
 # (stdlib: argparse)
 
-# For building executables (install when needed)
-# pyinstaller>=6.0.0
+# For building Windows .exe (install when needed)
+pyinstaller>=6.0.0
