@@ -174,6 +174,43 @@ def _parse_date(value: str) -> date | str:
     return s
 
 
+def _autofit_column(
+    ws: Worksheet,
+    col_idx: int,
+    padding: int = 2,
+    max_width: int = 80,
+    start_row: int | None = None,
+    end_row: int | None = None,
+) -> None:
+    """Set width for a single column based on content. Optional start_row/end_row limit which rows to measure (e.g. table only, to avoid merged header)."""
+    _CURRENCY_PADDING = 5
+    row_start = start_row if start_row is not None else 1
+    row_end = end_row if end_row is not None else ws.max_row
+    if row_end < row_start:
+        return
+    width = 0
+    for row_idx in range(row_start, row_end + 1):
+        cell = ws.cell(row=row_idx, column=col_idx)
+        val = cell.value
+        if val is not None:
+            s = str(val).strip()
+            if col_idx == 1:
+                parts = s.split()
+                first_word = parts[0] if parts else s
+                length = len(first_word)
+            elif "\n" in s:
+                length = max(len(line) for line in s.splitlines()) if s else 0
+            else:
+                length = len(s)
+            if cell.number_format and "R$" in str(cell.number_format):
+                length += _CURRENCY_PADDING
+            if length > width:
+                width = length
+    if width > 0:
+        width = min(width + padding, max_width)
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+
 def _autofit_columns(ws: Worksheet, padding: int = 2, max_width: int = 80) -> None:
     """Set column widths so content fits; avoid cut text. For wrap_text cells use max line length.
     Column A: fit to the longest first word. Currency (R$)-formatted cells get extra width for the prefix."""
@@ -469,8 +506,19 @@ def write_spreadsheet(
     _autofit_columns(ws)
     # Column B (VENCIMENTO): fit the header "VENCIMENTO" when bold
     ws.column_dimensions["B"].width = len("VENCIMENTO") + 3
-    # Column E (JUROS): shorter width (fit header + small padding) so table fits on one page
-    ws.column_dimensions["E"].width = len("JUROS") + 3
+    # Column E: autofit using only main table rows (skip header where E is merged B:E, so E stays narrow)
+    _autofit_column(
+        ws,
+        col_idx=5,
+        padding=2,
+        max_width=80,
+        start_row=table_start_row,
+        end_row=table_start_row + num_table_rows - 1 if num_table_rows else table_start_row,
+    )
+    # Column F: autofit the whole column
+    _autofit_column(ws, col_idx=6, padding=2, max_width=80)
+    # Column I (TOTAL): autofit the whole column so it fits content (incl. R$ and table)
+    _autofit_column(ws, col_idx=9, padding=2, max_width=80)
     # TAXAS RESULT column: fit the header "TAXAS RESULT" when bold (so table fits on one page)
     taxas_col_idx = next(
         (i + 1 for i, h in enumerate(header_row) if _normalize_header(str(h).strip()) == "TAXAS RESULT"),
