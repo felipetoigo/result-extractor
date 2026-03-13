@@ -17,7 +17,7 @@ OUTPUT_COLUMN_ORDER: list[str] | list[int] = [
     "JUROS",
     "MULTA",
     "TAXAS RESULT",
-    "HONORÁRIOS ADVOCATÍCIOS",
+    "HONORÁRIOS ADMINISTRATIVOS",
     "TOTAL",
 ]
 

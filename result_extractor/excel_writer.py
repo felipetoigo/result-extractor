@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 from openpyxl import Workbook
+from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
@@ -14,8 +15,8 @@ from .config import OUTPUT_COLUMN_ORDER, OUTPUT_SHEET_NAME
 
 
 def _normalize_header(name: str) -> str:
-    """Normalize header for comparison: strip, collapse spaces, uppercase, remove accents (e.g. CORREÇÃO → CORRECAO)."""
-    s = re.sub(r"\s+", " ", str(name).strip()).upper()
+    """Normalize header for comparison: strip, collapse spaces (incl. newlines), uppercase, remove accents (e.g. CORREÇÃO → CORRECAO)."""
+    s = re.sub(r"[\s\n\r]+", " ", str(name).strip()).upper()
     nfd = unicodedata.normalize("NFD", s)
     return "".join(c for c in nfd if unicodedata.category(c) != "Mn")
 
@@ -160,7 +161,7 @@ def _parse_date(value: str) -> date | str:
 
 
 def _autofit_columns(ws: Worksheet, padding: int = 2, max_width: int = 80) -> None:
-    """Set column widths so content fits; avoid cut text. Uses max of cell lengths per column."""
+    """Set column widths so content fits; avoid cut text. For wrap_text cells use max line length per column."""
     if ws.max_row == 0 or ws.max_column == 0:
         return
     for col_idx in range(1, ws.max_column + 1):
@@ -169,7 +170,11 @@ def _autofit_columns(ws: Worksheet, padding: int = 2, max_width: int = 80) -> No
             cell = ws.cell(row=row_idx, column=col_idx)
             val = cell.value
             if val is not None:
-                length = len(str(val).strip())
+                s = str(val).strip()
+                if "\n" in s:
+                    length = max(len(line) for line in s.splitlines()) if s else 0
+                else:
+                    length = len(s)
                 if length > width:
                     width = length
         if width > 0:
@@ -350,7 +355,10 @@ def write_spreadsheet(
         row_idx = table_start_row + row_offset
         for col_idx, cell in enumerate(row, start=1):
             c = ws.cell(row=row_idx, column=col_idx)
-            if venci_col_0based is not None and (col_idx - 1) == venci_col_0based:
+            if row_offset == 0 and isinstance(cell, str) and "\n" in cell:
+                c.value = cell
+                c.alignment = Alignment(wrap_text=True)
+            elif venci_col_0based is not None and (col_idx - 1) == venci_col_0based:
                 val = _parse_date(cell)
                 c.value = val
                 if isinstance(val, date):
