@@ -315,6 +315,7 @@ def write_spreadsheet(
     ws.title = name[:31]
 
     # Header section: Field and Value only (no "Page" column, no "Field"/"Value" header row)
+    header_section_start = 1
     if header_rows:
         if isinstance(header_rows[0][0], int):
             for row in header_rows:
@@ -322,6 +323,14 @@ def write_spreadsheet(
         else:
             for row in header_rows:
                 ws.append([row[0], row[1]])
+        # Merge cells B to I on each header row (line level only)
+        for row_idx in range(header_section_start, header_section_start + len(header_rows)):
+            ws.merge_cells(
+                start_row=row_idx,
+                start_column=2,
+                end_row=row_idx,
+                end_column=9,
+            )
     # Blank row to separate header from table (use [""] so openpyxl creates a real row)
     ws.append([""])
 
