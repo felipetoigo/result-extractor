@@ -377,5 +377,8 @@ def write_spreadsheet(
                     c.number_format = "0.00"
 
     _autofit_columns(ws)
+    # Set column B (VENCIMENTO) to fit only the header "VENCIMENTO" so the sheet fits on one page when printing
+    venci_col_letter = get_column_letter(2)
+    ws.column_dimensions[venci_col_letter].width = len("VENCIMENTO") + 2
     wb.save(path)
     return path.resolve()
