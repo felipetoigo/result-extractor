@@ -272,8 +272,11 @@ def convert_pdf_to_spreadsheet(
     # 6) Fill HR and HA columns: 20% of (VCM + JUROS + MULTA) for each data row
     combined_table_rows = _fill_hr_ha_columns(combined_table_rows)
 
-    # 7) Drop HONORÁRIOS column (after all calculations)
-    combined_table_rows = _drop_columns(combined_table_rows, ["HONORÁRIOS"])
+    # 7) Drop HONORÁRIOS and CORREÇÃO MONETÁRIA columns (after all calculations)
+    combined_table_rows = _drop_columns(
+        combined_table_rows,
+        ["HONORÁRIOS", "CORREÇÃO MONETÁRIA", "Correção"],
+    )
 
     # 8) Output path and options
     if output_dir is None:

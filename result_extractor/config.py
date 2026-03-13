@@ -13,7 +13,6 @@ OUTPUT_COLUMN_ORDER: list[str] | list[int] = [
     "ESPÉCIE",
     "VENCIMENTO",
     "VALOR",
-    "CORREÇÃO MONETÁRIA",
     "VCM",
     "JUROS",
     "MULTA",
