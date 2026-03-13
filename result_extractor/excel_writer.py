@@ -14,13 +14,14 @@ from openpyxl.worksheet.worksheet import Worksheet
 # Excel number format for Brazilian currency (R$ with 2 decimals; values remain numeric for calculations)
 _CURRENCY_FORMAT = '"R$ "#,##0.00'
 
-# Shared styling: all borders (thin), light gray fill, bold
+# Shared styling: all borders (thin), light gray fill, bold, no border
 _THIN_BORDER = Border(
     left=Side(style="thin"),
     right=Side(style="thin"),
     top=Side(style="thin"),
     bottom=Side(style="thin"),
 )
+_NO_BORDER = Border()
 _LIGHT_GRAY_FILL = PatternFill(patternType="solid", fgColor="D3D3D3")
 _BOLD_FONT = Font(bold=True)
 
@@ -373,13 +374,16 @@ def write_spreadsheet(
     # Blank row to separate header from table (use [""] so openpyxl creates a real row)
     ws.append([""])
 
-    # Style header section: all borders; column A bold + light gray
+    # Style header section: all borders except column F; column A bold + light gray
     if header_rows:
         num_header_rows = len(header_rows)
         for row_idx in range(header_section_start, header_section_start + num_header_rows):
-            for col_idx in range(1, 10):  # A through I (F left as is, G-I fixed table)
+            for col_idx in range(1, 10):  # A through I
                 c = ws.cell(row=row_idx, column=col_idx)
-                c.border = _THIN_BORDER
+                if col_idx == 6:  # Column F: no borders in header
+                    c.border = _NO_BORDER
+                else:
+                    c.border = _THIN_BORDER
                 if col_idx == 1:
                     c.font = _BOLD_FONT
                     c.fill = _LIGHT_GRAY_FILL
@@ -411,6 +415,10 @@ def write_spreadsheet(
 
     # Table: write row by row, cell by cell; numbers as numeric with exactly 2 decimals (Brazilian)
     table_start_row = ws.max_row + 1
+    # Remove borders below fixed table (below G5-H5, I5) until the first line of the main table
+    for row_idx in range(6, table_start_row):
+        for col_idx in (7, 8, 9):
+            ws.cell(row=row_idx, column=col_idx).border = _NO_BORDER
     for row_offset, row in enumerate(table_part):
         row_idx = table_start_row + row_offset
         for col_idx, cell in enumerate(row, start=1):
@@ -461,6 +469,15 @@ def write_spreadsheet(
     _autofit_columns(ws)
     # Column B (VENCIMENTO): fit the header "VENCIMENTO" when bold
     ws.column_dimensions["B"].width = len("VENCIMENTO") + 3
+    # Column E (JUROS): shorter width (fit header + small padding) so table fits on one page
+    ws.column_dimensions["E"].width = len("JUROS") + 3
+    # TAXAS RESULT column: fit the header "TAXAS RESULT" when bold (so table fits on one page)
+    taxas_col_idx = next(
+        (i + 1 for i, h in enumerate(header_row) if _normalize_header(str(h).strip()) == "TAXAS RESULT"),
+        None,
+    )
+    if taxas_col_idx is not None:
+        ws.column_dimensions[get_column_letter(taxas_col_idx)].width = len("TAXAS RESULT") + 3
     # Column H (HONORÁRIOS ADVOCATÍCIOS): slightly wider so "ADVOCATÍCIOS" stays on one line (avoid "S" on third line)
     hon_col_idx = next(
         (i + 1 for i, h in enumerate(header_row) if isinstance(h, str) and "ADVOCATÍCIOS" in h),
