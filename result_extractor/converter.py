@@ -138,6 +138,21 @@ def _fill_hr_ha_columns(rows: list[list]) -> list[list]:
     return result
 
 
+def _rename_header_columns(rows: list[list], renames: dict[str, str]) -> list[list]:
+    """
+    Rename header cells for display only (first row). renames maps exact header text -> new name.
+    Variables in code still use the original names; only the spreadsheet shows the new names.
+    """
+    if not rows or not renames:
+        return rows
+    header = list(rows[0])
+    for i, cell in enumerate(header):
+        s = str(cell).strip()
+        if s in renames:
+            header[i] = renames[s]
+    return [header] + list(rows[1:])
+
+
 def _drop_columns(rows: list[list], column_names: list[str]) -> list[list]:
     """
     Remove columns by header name (normalized match). Keeps all other columns in order.
@@ -278,7 +293,13 @@ def convert_pdf_to_spreadsheet(
         ["HONORÁRIOS", "CORREÇÃO MONETÁRIA", "Correção"],
     )
 
-    # 8) Output path and options
+    # 8) Rename header for display only: VCM -> VALOR CORRIGIDO, HR -> TAXAS RESULT, HA -> HONORÁRIOS ADVOCATÍCIOS
+    combined_table_rows = _rename_header_columns(
+        combined_table_rows,
+        {"VCM": "VALOR CORRIGIDO", "HR": "TAXAS RESULT", "HA": "HONORÁRIOS ADVOCATÍCIOS"},
+    )
+
+    # 9) Output path and options
     if output_dir is None:
         output_dir = Path.home() / "Desktop"
     output_dir = Path(output_dir)
@@ -286,7 +307,7 @@ def convert_pdf_to_spreadsheet(
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     out_path = output_dir / f"exported_{timestamp}.xlsx"
 
-    # 9) Write once, outside any page loop
+    # 10) Write once, outside any page loop
     return write_spreadsheet(
         all_header_rows,
         combined_table_rows,
