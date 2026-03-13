@@ -138,6 +138,24 @@ def _fill_hr_ha_columns(rows: list[list]) -> list[list]:
     return result
 
 
+def _drop_columns(rows: list[list], column_names: list[str]) -> list[list]:
+    """
+    Remove columns by header name (normalized match). Keeps all other columns in order.
+    """
+    if not rows:
+        return rows
+    header = rows[0]
+    drop_set = {_normalize_header(name) for name in column_names}
+    keep_indices = [
+        i for i, h in enumerate(header)
+        if _normalize_header(str(h).strip()) not in drop_set
+    ]
+    return [
+        [(row[i] if i < len(row) else "") for i in keep_indices]
+        for row in rows
+    ]
+
+
 def convert_pdf_to_xlsx(
     pdf_path: str | Path,
     xlsx_path: str | Path | None = None,
@@ -254,7 +272,10 @@ def convert_pdf_to_spreadsheet(
     # 6) Fill HR and HA columns: 20% of (VCM + JUROS + MULTA) for each data row
     combined_table_rows = _fill_hr_ha_columns(combined_table_rows)
 
-    # 7) Output path and options
+    # 7) Drop HONORÁRIOS column (after all calculations)
+    combined_table_rows = _drop_columns(combined_table_rows, ["HONORÁRIOS"])
+
+    # 8) Output path and options
     if output_dir is None:
         output_dir = Path.home() / "Desktop"
     output_dir = Path(output_dir)
@@ -262,7 +283,7 @@ def convert_pdf_to_spreadsheet(
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     out_path = output_dir / f"exported_{timestamp}.xlsx"
 
-    # 8) Write once, outside any page loop
+    # 9) Write once, outside any page loop
     return write_spreadsheet(
         all_header_rows,
         combined_table_rows,
