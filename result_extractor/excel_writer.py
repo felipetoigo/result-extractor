@@ -11,6 +11,9 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
+# Excel number format for Brazilian currency (R$ with 2 decimals; values remain numeric for calculations)
+_CURRENCY_FORMAT = '"R$ "#,##0.00'
+
 # Shared styling: all borders (thin), light gray fill, bold
 _THIN_BORDER = Border(
     left=Side(style="thin"),
@@ -360,12 +363,20 @@ def write_spreadsheet(
                     c.font = _BOLD_FONT
                     c.fill = _LIGHT_GRAY_FILL
 
-    # Find VENCIMENTO column (0-based) for date formatting
+    # Find VENCIMENTO column (0-based) for date formatting; identify monetary columns for R$ format
     header_row = table_part[0] if table_part else []
     venci_col_0based = next(
         (i for i, h in enumerate(header_row) if str(h).strip().upper() == "VENCIMENTO"),
         None,
     )
+    _monetary_headers = {
+        "VALOR", "VALOR CORRIGIDO", "JUROS", "MULTA", "TAXAS RESULT",
+        "HONORARIOS ADVOCATICIOS", "TOTAL",
+    }
+    monetary_cols_0based = {
+        i for i, h in enumerate(header_row)
+        if _normalize_header(str(h).strip()) in _monetary_headers
+    }
 
     # Convert table with pandas + re: Brazilian numbers → float (2 decimals)
     table_part = _convert_table_brazilian_pandas(table_part, venci_col_0based)
@@ -394,8 +405,11 @@ def write_spreadsheet(
                     val = _to_number(cell)  # fallback: parse Brazilian string (e.g. "260,000" → 260.0)
                 c.value = val
                 if isinstance(val, (int, float)):
-                    # Force exactly 2 decimal places in display (Excel format 0.00)
-                    c.number_format = "0.00"
+                    # Monetary columns: R$ format; others: 2 decimal places
+                    if (col_idx - 1) in monetary_cols_0based:
+                        c.number_format = _CURRENCY_FORMAT
+                    else:
+                        c.number_format = "0.00"
 
     # Style table: all borders; first row (header) and last row (totals) bold + light gray
     num_table_cols = len(table_part[0]) if table_part else 0
