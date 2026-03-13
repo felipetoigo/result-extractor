@@ -7,9 +7,19 @@ from pathlib import Path
 
 import pandas as pd
 from openpyxl import Workbook
-from openpyxl.styles import Alignment
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
+
+# Shared styling: all borders (thin), light gray fill, bold
+_THIN_BORDER = Border(
+    left=Side(style="thin"),
+    right=Side(style="thin"),
+    top=Side(style="thin"),
+    bottom=Side(style="thin"),
+)
+_LIGHT_GRAY_FILL = PatternFill(patternType="solid", fgColor="D3D3D3")
+_BOLD_FONT = Font(bold=True)
 
 from .config import OUTPUT_COLUMN_ORDER, OUTPUT_SHEET_NAME
 
@@ -339,6 +349,17 @@ def write_spreadsheet(
     # Blank row to separate header from table (use [""] so openpyxl creates a real row)
     ws.append([""])
 
+    # Style header section: all borders; column A bold + light gray
+    if header_rows:
+        num_header_rows = len(header_rows)
+        for row_idx in range(header_section_start, header_section_start + num_header_rows):
+            for col_idx in range(1, 10):  # A through I (merged B:I)
+                c = ws.cell(row=row_idx, column=col_idx)
+                c.border = _THIN_BORDER
+                if col_idx == 1:
+                    c.font = _BOLD_FONT
+                    c.fill = _LIGHT_GRAY_FILL
+
     # Find VENCIMENTO column (0-based) for date formatting
     header_row = table_part[0] if table_part else []
     venci_col_0based = next(
@@ -376,9 +397,32 @@ def write_spreadsheet(
                     # Force exactly 2 decimal places in display (Excel format 0.00)
                     c.number_format = "0.00"
 
+    # Style table: all borders; first row (header) bold + light gray
+    num_table_cols = len(table_part[0]) if table_part else 0
+    num_table_rows = len(table_part) if table_part else 0
+    for row_offset in range(num_table_rows):
+        row_idx = table_start_row + row_offset
+        for col_idx in range(1, num_table_cols + 1):
+            c = ws.cell(row=row_idx, column=col_idx)
+            c.border = _THIN_BORDER
+            if row_offset == 0:
+                c.font = _BOLD_FONT
+                c.fill = _LIGHT_GRAY_FILL
+
     _autofit_columns(ws)
-    # Set column B (VENCIMENTO) to fit only the header "VENCIMENTO" so the sheet fits on one page when printing
-    venci_col_letter = get_column_letter(2)
-    ws.column_dimensions[venci_col_letter].width = len("VENCIMENTO") + 2
+    # Column A: fit bolded date "Joinville, 09 de Março de 2026" (header section)
+    ws.column_dimensions["A"].width = len("Joinville, 09 de Março de 2026") + 3
+    # Column B (VENCIMENTO): fit the header "VENCIMENTO" when bold
+    ws.column_dimensions["B"].width = len("VENCIMENTO") + 3
+    # Column H (HONORÁRIOS ADMINISTRATIVOS): slightly wider so "ADMINISTRATIVOS" stays on one line (avoid "S" on third line)
+    hon_col_idx = next(
+        (i + 1 for i, h in enumerate(header_row) if isinstance(h, str) and "ADMINISTRATIVOS" in h),
+        8,
+    )
+    hon_letter = get_column_letter(hon_col_idx)
+    ws.column_dimensions[hon_letter].width = max(
+        ws.column_dimensions[hon_letter].width or 0,
+        len("ADMINISTRATIVOS") + 4,
+    )
     wb.save(path)
     return path.resolve()
