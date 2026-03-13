@@ -397,17 +397,24 @@ def write_spreadsheet(
                     # Force exactly 2 decimal places in display (Excel format 0.00)
                     c.number_format = "0.00"
 
-    # Style table: all borders; first row (header) bold + light gray
+    # Style table: all borders; first row (header) and last row (totals) bold + light gray
     num_table_cols = len(table_part[0]) if table_part else 0
     num_table_rows = len(table_part) if table_part else 0
     for row_offset in range(num_table_rows):
         row_idx = table_start_row + row_offset
+        is_first_row = row_offset == 0
+        is_last_row = num_table_rows > 1 and row_offset == num_table_rows - 1
         for col_idx in range(1, num_table_cols + 1):
             c = ws.cell(row=row_idx, column=col_idx)
             c.border = _THIN_BORDER
-            if row_offset == 0:
+            if is_first_row:
                 c.font = _BOLD_FONT
                 c.fill = _LIGHT_GRAY_FILL
+            elif is_last_row:
+                c.font = _BOLD_FONT
+                c.fill = _LIGHT_GRAY_FILL
+                if col_idx == 1:
+                    c.value = "TOTAIS"
 
     _autofit_columns(ws)
     # Column B (VENCIMENTO): fit the header "VENCIMENTO" when bold
