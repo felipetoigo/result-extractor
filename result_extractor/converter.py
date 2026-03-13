@@ -108,6 +108,36 @@ def _fill_vcm_column(rows: list[list]) -> list[list]:
     return result
 
 
+def _fill_hr_ha_columns(rows: list[list]) -> list[list]:
+    """
+    Fill HR and HA columns with 20% of (VCM + JUROS + MULTA) for each data row.
+    Same value in both columns. Example: (236.89 + 227.81 + 4.74) * 0.2 = 93.89.
+    """
+    if not rows or len(rows) < 2:
+        return rows
+    header = rows[0]
+    idx_vcm = next((i for i, h in enumerate(header) if str(h).strip().upper() == "VCM"), None)
+    idx_juros = _find_header_index(header, "JUROS", exact=False)
+    idx_multa = _find_header_index(header, "MULTA", exact=False)
+    idx_hr = next((i for i, h in enumerate(header) if str(h).strip().upper() == "HR"), None)
+    idx_ha = next((i for i, h in enumerate(header) if str(h).strip().upper() == "HA"), None)
+    if idx_vcm is None or idx_juros is None or idx_multa is None or idx_hr is None or idx_ha is None:
+        return rows
+    result = [list(header)]
+    for row in rows[1:]:
+        new_row = list(row)
+        vcm = _cell_to_float(new_row[idx_vcm] if idx_vcm < len(row) else 0)
+        juros = _cell_to_float(new_row[idx_juros] if idx_juros < len(row) else 0)
+        multa = _cell_to_float(new_row[idx_multa] if idx_multa < len(row) else 0)
+        value = round((vcm + juros + multa) * 0.2, 2)
+        if idx_hr < len(new_row):
+            new_row[idx_hr] = value
+        if idx_ha < len(new_row):
+            new_row[idx_ha] = value
+        result.append(new_row)
+    return result
+
+
 def convert_pdf_to_xlsx(
     pdf_path: str | Path,
     xlsx_path: str | Path | None = None,
@@ -221,7 +251,10 @@ def convert_pdf_to_spreadsheet(
     # 5) Fill VCM column: VCM = VALOR + CORREÇÃO MONETÁRIA for each data row
     combined_table_rows = _fill_vcm_column(combined_table_rows)
 
-    # 6) Output path and options
+    # 6) Fill HR and HA columns: 20% of (VCM + JUROS + MULTA) for each data row
+    combined_table_rows = _fill_hr_ha_columns(combined_table_rows)
+
+    # 7) Output path and options
     if output_dir is None:
         output_dir = Path.home() / "Desktop"
     output_dir = Path(output_dir)
@@ -229,7 +262,7 @@ def convert_pdf_to_spreadsheet(
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     out_path = output_dir / f"exported_{timestamp}.xlsx"
 
-    # 7) Write once, outside any page loop
+    # 8) Write once, outside any page loop
     return write_spreadsheet(
         all_header_rows,
         combined_table_rows,
