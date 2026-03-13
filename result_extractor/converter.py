@@ -16,6 +16,32 @@ from .excel_writer import write_xlsx, write_spreadsheet
 from .pdf_reader import extract_tables, extract_header_and_tables
 
 
+def _cell_to_float(cell) -> float:
+    """Parse cell to float (Brazilian: comma=decimal, dot=thousands). Return 0.0 if not parseable."""
+    if cell is None or cell == "":
+        return 0.0
+    if isinstance(cell, (int, float)):
+        return float(cell)
+    s = str(cell).strip()
+    s = re.sub(r"R\$\s*", "", s, flags=re.I)
+    s = "".join(c for c in s if c in "0123456789,.-").strip()
+    if not s:
+        return 0.0
+    if "," in s:
+        parts = s.split(",", 1)
+        int_part = parts[0].replace(".", "").strip()
+        dec_str = "".join(c for c in parts[1] if c.isdigit())[:2].ljust(2, "0") or "00"
+        try:
+            sign = -1 if int_part.startswith("-") else 1
+            return sign * (abs(int(int_part)) + int(dec_str) / 100.0)
+        except ValueError:
+            return 0.0
+    try:
+        return float(s.replace(".", ""))
+    except ValueError:
+        return 0.0
+
+
 def _find_header_index(header: list, after_name: str, exact: bool = False) -> int | None:
     """Return 0-based index of column with name after_name. If exact, match by string; else normalized."""
     for i, h in enumerate(header):
@@ -54,6 +80,32 @@ def _add_blank_columns(rows: list[list], inserts: list[tuple[str | list[str], st
             new_rows.append(new_row)
         rows = new_rows
     return rows
+
+
+def _fill_vcm_column(rows: list[list]) -> list[list]:
+    """
+    Fill VCM column with VALOR + CORREÇÃO MONETÁRIA for each data row.
+    Uses normalized header matching (CORREÇÃO MONETÁRIA or short form Correção).
+    """
+    if not rows or len(rows) < 2:
+        return rows
+    header = rows[0]
+    idx_valor = _find_header_index(header, "VALOR", exact=False)
+    idx_correcao = _find_header_index(header, "CORREÇÃO MONETÁRIA", exact=False)
+    if idx_correcao is None:
+        idx_correcao = _find_header_index(header, "Correção", exact=False)
+    idx_vcm = next((i for i, h in enumerate(header) if str(h).strip().upper() == "VCM"), None)
+    if idx_valor is None or idx_correcao is None or idx_vcm is None:
+        return rows
+    result = [list(header)]
+    for row in rows[1:]:
+        new_row = list(row)
+        if idx_vcm < len(new_row):
+            valor = _cell_to_float(new_row[idx_valor] if idx_valor < len(row) else 0)
+            correcao = _cell_to_float(new_row[idx_correcao] if idx_correcao < len(row) else 0)
+            new_row[idx_vcm] = round(valor + correcao, 2)
+        result.append(new_row)
+    return result
 
 
 def convert_pdf_to_xlsx(
@@ -166,7 +218,10 @@ def convert_pdf_to_spreadsheet(
         ],
     )
 
-    # 5) Output path and options
+    # 5) Fill VCM column: VCM = VALOR + CORREÇÃO MONETÁRIA for each data row
+    combined_table_rows = _fill_vcm_column(combined_table_rows)
+
+    # 6) Output path and options
     if output_dir is None:
         output_dir = Path.home() / "Desktop"
     output_dir = Path(output_dir)
@@ -174,7 +229,7 @@ def convert_pdf_to_spreadsheet(
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     out_path = output_dir / f"exported_{timestamp}.xlsx"
 
-    # 6) Write once, outside any page loop
+    # 7) Write once, outside any page loop
     return write_spreadsheet(
         all_header_rows,
         combined_table_rows,
