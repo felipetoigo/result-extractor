@@ -370,17 +370,17 @@ def convert_pdf_to_spreadsheet_imobiliarias(
     output_dir: str | Path | None = None,
 ) -> Path:
     """
-    IMOBILIÁRIAS operation: no HR/HA; Honorários Advocatícios = HONORÁRIOS from PDF.
+    IMOBILIÁRIAS operation: no HR/HA; HONORÁRIOS from PDF kept as "HONORÁRIOS".
 
     PDF columns: ESPÉCIE, TÍTULO, VENCIMENTO, ATRASO, VALOR, CORREÇÃO MONETÁRIA,
     JUROS, MULTA, HONORÁRIOS, TOTAL. Excludes TÍTULO and ATRASO. Adds only VCM
-    (VALOR + CORREÇÃO MONETÁRIA); HONORÁRIOS is kept and renamed to Honorários
-    Advocatícios (no 20% calculation). Output: exported_imobiliarias_<timestamp>.xlsx.
+    (VALOR + CORREÇÃO MONETÁRIA); HONORÁRIOS is kept with header "HONORÁRIOS"
+    (no 20% calculation). Output: exported_imobiliarias_<timestamp>.xlsx.
     """
     from datetime import datetime
 
     columns_to_exclude = ["TÍTULO", "ATRASO"]
-    # No TAXAS RESULT or HR/HA; HONORÁRIOS from PDF becomes "HONORÁRIOS ADVOCATÍCIOS"
+    # No TAXAS RESULT or HR/HA; column stays "HONORÁRIOS" (imobiliárias context)
     column_order: list[str] = [
         "ESPÉCIE",
         "VENCIMENTO",
@@ -388,7 +388,7 @@ def convert_pdf_to_spreadsheet_imobiliarias(
         "VALOR CORRIGIDO",
         "JUROS",
         "MULTA",
-        "HONORÁRIOS ADVOCATÍCIOS",
+        "HONORÁRIOS",
         "TOTAL",
     ]
     has_header = True
@@ -422,15 +422,15 @@ def convert_pdf_to_spreadsheet_imobiliarias(
         [(["CORREÇÃO MONETÁRIA", "Correção", "VALOR"], "VCM")],
     )
     combined_table_rows = _fill_vcm_column(combined_table_rows)
-    # Drop only CORREÇÃO MONETÁRIA; keep HONORÁRIOS (will be renamed to Honorários Advocatícios)
+    # Drop only CORREÇÃO MONETÁRIA; keep HONORÁRIOS (display as "HONORÁRIOS" in imobiliárias)
     combined_table_rows = _drop_columns(
         combined_table_rows,
         ["CORREÇÃO MONETÁRIA", "Correção"],
     )
-    # VCM -> VALOR CORRIGIDO; HONORÁRIOS -> display as Honorários Advocatícios (same values from PDF)
+    # VCM -> VALOR CORRIGIDO; HONORÁRIOS stays "HONORÁRIOS" (no rename)
     combined_table_rows = _rename_header_columns(
         combined_table_rows,
-        {"VCM": "VALOR CORRIGIDO", "HONORÁRIOS": "HONORÁRIOS\nADVOCATÍCIOS"},
+        {"VCM": "VALOR CORRIGIDO"},
     )
     combined_table_rows = _fill_column_with_value(combined_table_rows, "ESPÉCIE", "COTA")
 

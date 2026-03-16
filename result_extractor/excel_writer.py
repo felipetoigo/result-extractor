@@ -452,7 +452,7 @@ def write_spreadsheet(
     )
     _monetary_headers = {
         "VALOR", "VALOR CORRIGIDO", "JUROS", "MULTA", "TAXAS RESULT",
-        "HONORARIOS ADVOCATICIOS", "TOTAL",
+        "HONORARIOS ADVOCATICIOS", "HONORARIOS", "TOTAL",
     }
     monetary_cols_0based = {
         i for i, h in enumerate(header_row)
