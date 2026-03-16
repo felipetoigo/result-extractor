@@ -53,25 +53,44 @@ def import_and_convert() -> None:
         messagebox.showerror("Error", str(e))
 
 
+def imobiliarias_import_and_convert() -> None:
+    """IMOBILIÁRIAS flow: import PDF and convert (rules to be defined)."""
+    # TODO: define and implement IMOBILIÁRIAS-specific rules
+    pass
+
+
 def main() -> None:
     root = tk.Tk()
     root.title("Result Extractor")
-    root.geometry("480x220")
+    root.geometry("480x260")
     root.resizable(True, True)
 
     frame = tk.Frame(root, padx=48, pady=48)
     frame.pack()
 
-    btn = tk.Button(
+    btn_condominios = tk.Button(
         frame,
-        text="Importar e Converter",
+        text="CONDOMÍNIOS - Importar e Converter",
         command=import_and_convert,
         font=("", 12),
+        width=38,
         padx=20,
         pady=10,
         cursor="hand2",
     )
-    btn.pack()
+    btn_condominios.pack(pady=(0, 8))
+
+    btn_imobiliarias = tk.Button(
+        frame,
+        text="IMOBILIÁRIAS - Importar e converter",
+        command=imobiliarias_import_and_convert,
+        font=("", 12),
+        width=38,
+        padx=20,
+        pady=10,
+        cursor="hand2",
+    )
+    btn_imobiliarias.pack()
 
     root.mainloop()
 
