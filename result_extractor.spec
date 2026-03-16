@@ -2,14 +2,18 @@
 # Build on Windows: pyinstaller result_extractor.spec
 
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_data_files
 
 block_cipher = None
+
+# CustomTkinter themes/fonts (required for GUI to render correctly)
+ctk_datas = collect_data_files('customtkinter')
 
 a = Analysis(
     ['gui.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=ctk_datas,
     hiddenimports=[
         'result_extractor',
         'result_extractor.converter',
@@ -19,6 +23,7 @@ a = Analysis(
         'pdfplumber',
         'openpyxl',
         'pandas',
+        'customtkinter',
     ],
     hookspath=[],
     hooksconfig={},
