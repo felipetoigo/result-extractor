@@ -352,7 +352,7 @@ def convert_pdf_to_spreadsheet(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    out_path = output_dir / f"exported_{timestamp}.xlsx"
+    out_path = output_dir / f"exported_condominios_{timestamp}.xlsx"
 
     # 12) Write once, outside any page loop
     return write_spreadsheet(

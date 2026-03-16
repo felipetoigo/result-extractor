@@ -474,7 +474,7 @@ def write_spreadsheet(
             c = ws.cell(row=row_idx, column=col_idx)
             if row_offset == 0 and isinstance(cell, str) and "\n" in cell:
                 c.value = cell
-                c.alignment = Alignment(wrap_text=True)
+                c.alignment = Alignment(horizontal="center", wrap_text=True)
             elif venci_col_0based is not None and (col_idx - 1) == venci_col_0based:
                 val = _parse_date(cell)
                 c.value = val
@@ -496,7 +496,7 @@ def write_spreadsheet(
                     else:
                         c.number_format = "0.00"
 
-    # Style table: all borders; first row (header) and last row (totals) bold + light gray
+    # Style table: all borders; first row (header) and last row (totals) bold + light gray; all table cells centered
     num_table_cols = len(table_part[0]) if table_part else 0
     num_table_rows = len(table_part) if table_part else 0
     for row_offset in range(num_table_rows):
@@ -506,6 +506,11 @@ def write_spreadsheet(
         for col_idx in range(1, num_table_cols + 1):
             c = ws.cell(row=row_idx, column=col_idx)
             c.border = _THIN_BORDER
+            # Center alignment for whole table (preserve wrap_text if set)
+            c.alignment = Alignment(
+                horizontal="center",
+                wrap_text=getattr(c.alignment, "wrap_text", False),
+            )
             if is_first_row:
                 c.font = _BOLD_FONT
                 c.fill = _LIGHT_GRAY_FILL
