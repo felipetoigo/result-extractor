@@ -189,21 +189,3 @@ def extract_tables(pdf_path: str | Path) -> list[list[list[str]]]:
                     if normalized:
                         tables.append(normalized)
     return tables
-
-
-def extract_first_table(pdf_path: str | Path) -> list[list[str]]:
-    """
-    Extract the first table only (all rows as list of lists).
-
-    Convenience when the PDF has a single table.
-
-    Args:
-        pdf_path: Path to the PDF file.
-
-    Returns:
-        First table as list of rows.
-    """
-    tables = extract_tables(pdf_path)
-    if not tables:
-        raise ValueError(f"No tables found in PDF: {pdf_path}")
-    return tables[0]

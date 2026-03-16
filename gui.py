@@ -26,7 +26,8 @@ def get_pdf_to_convert_dir() -> Path:
 
 
 def import_and_convert() -> None:
-    initial_dir = get_pdf_to_convert_dir() if get_pdf_to_convert_dir().is_dir() else None
+    pdf_dir = get_pdf_to_convert_dir()
+    initial_dir = str(pdf_dir) if pdf_dir.is_dir() else None
     pdf_path = filedialog.askopenfilename(
         title="Select PDF file",
         initialdir=initial_dir,
@@ -77,4 +78,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-    sys.exit(0)

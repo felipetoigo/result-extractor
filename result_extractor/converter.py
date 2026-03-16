@@ -5,6 +5,8 @@ import unicodedata
 from pathlib import Path
 
 from .config import COLUMNS_TO_EXCLUDE, HAS_HEADER_ROW, OUTPUT_COLUMN_ORDER
+from .excel_writer import write_xlsx, write_spreadsheet
+from .pdf_reader import extract_tables, extract_header_and_tables
 
 # Brazilian date pattern in header (e.g. "Joinville, 09 de Março de 2026" or "09 de Março de 2026")
 _DATE_HEADER_PATTERN = re.compile(
@@ -28,8 +30,6 @@ def _normalize_header(name: str) -> str:
     s = re.sub(r"\s+", " ", str(name).strip()).upper()
     nfd = unicodedata.normalize("NFD", s)
     return "".join(c for c in nfd if unicodedata.category(c) != "Mn")
-from .excel_writer import write_xlsx, write_spreadsheet
-from .pdf_reader import extract_tables, extract_header_and_tables
 
 
 def _cell_to_float(cell) -> float:
