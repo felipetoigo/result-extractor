@@ -137,7 +137,7 @@ def main() -> None:
     # Buttons: large, centered, orange primary style
     btn_condominios = ctk.CTkButton(
         main_container,
-        text="CONDOMÍNIOS – Importar e Converter",
+        text="CONDOMÍNIOS – Importar e converter",
         command=import_and_convert,
         font=ctk.CTkFont(family=FONT_FAMILY, size=FONT_SIZE_BUTTON),
         width=BUTTON_WIDTH,
