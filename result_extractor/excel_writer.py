@@ -27,6 +27,21 @@ _BOLD_FONT = Font(bold=True)
 
 from .config import OUTPUT_COLUMN_ORDER, OUTPUT_SHEET_NAME
 
+# Fixed table (rows 1–5, cols G:I) — one per operation
+CONDOMINIOS_FIXED_TABLE_ROWS: list[tuple[str, str]] = [
+    ("Correção monetária", "INPC"),
+    ("Multa moratória", "2%"),
+    ("Juros moratórios (mensal)", "1%"),
+    ("Result Cobranças", "20%"),
+    ("Honorários Advocatícios", "20%"),
+]
+IMOBILIARIAS_FIXED_TABLE_ROWS: list[tuple[str, str]] = [
+    ("Correção monetária", "INPC"),
+    ("Multa moratória", "10%"),
+    ("Juros moratórios (mensal)", "1%"),
+    ("Honorários Advocatícios", "20%"),
+]
+
 
 def _normalize_header(name: str) -> str:
     """Normalize header for comparison: strip, collapse spaces (incl. newlines), uppercase, remove accents (e.g. CORREÇÃO → CORRECAO)."""
@@ -348,6 +363,7 @@ def write_spreadsheet(
     sheet_name: str | None = None,
     column_order: list[str] | list[int] | None = None,
     has_header: bool = True,
+    fixed_table_rows: list[tuple[str, str]] | None = None,
 ) -> Path:
     """
     Write a single sheet with (1) header section, (2) blank row, (3) table.
@@ -360,6 +376,7 @@ def write_spreadsheet(
         sheet_name: Sheet name; uses config default if None.
         column_order: Optional column order for the table section.
         has_header: Whether first row of table_rows is a header row.
+        fixed_table_rows: Rows for the fixed table (G:I). Default: CONDOMINIOS_FIXED_TABLE_ROWS.
 
     Returns:
         Resolved output path.
@@ -396,15 +413,9 @@ def write_spreadsheet(
                 end_row=row_idx,
                 end_column=5,
             )
-    # Fixed table to the right of column F: rows 1-5, labels in merged G:H, values in I
-    _FIXED_TABLE_ROWS = [
-        ("Correção monetária", "INPC"),
-        ("Multa moratória", "2%"),
-        ("Juros moratórios (mensal)", "1%"),
-        ("Result Cobranças", "20%"),
-        ("Honorários Advocatícios", "20%"),
-    ]
-    for row_idx, (label, value) in enumerate(_FIXED_TABLE_ROWS, start=1):
+    # Fixed table to the right of column F: rows 1–N, labels in merged G:H, values in I
+    fixed = fixed_table_rows if fixed_table_rows is not None else CONDOMINIOS_FIXED_TABLE_ROWS
+    for row_idx, (label, value) in enumerate(fixed, start=1):
         ws.cell(row=row_idx, column=7).value = label
         ws.merge_cells(start_row=row_idx, start_column=7, end_row=row_idx, end_column=8)
         ws.cell(row=row_idx, column=9).value = value
@@ -424,8 +435,9 @@ def write_spreadsheet(
                 if col_idx == 1:
                     c.font = _BOLD_FONT
                     c.fill = _LIGHT_GRAY_FILL
-    # Fixed table (rows 1-5, G:H merged label, I value): borders + bold on label
-    for row_idx in range(1, 6):
+    # Fixed table (G:H merged label, I value): borders + bold on label
+    num_fixed_rows = len(fixed)
+    for row_idx in range(1, num_fixed_rows + 1):
         for col_idx in (7, 8, 9):
             c = ws.cell(row=row_idx, column=col_idx)
             c.border = _THIN_BORDER
@@ -440,7 +452,7 @@ def write_spreadsheet(
     )
     _monetary_headers = {
         "VALOR", "VALOR CORRIGIDO", "JUROS", "MULTA", "TAXAS RESULT",
-        "HONORARIOS ADVOCATICIOS", "TOTAL",
+        "HONORARIOS ADVOCATICIOS", "HONORARIOS", "TOTAL",
     }
     monetary_cols_0based = {
         i for i, h in enumerate(header_row)
@@ -453,7 +465,7 @@ def write_spreadsheet(
     # Table: write row by row, cell by cell; numbers as numeric with exactly 2 decimals (Brazilian)
     table_start_row = ws.max_row + 1
     # Remove borders below fixed table (below G5-H5, I5) until the first line of the main table
-    for row_idx in range(6, table_start_row):
+    for row_idx in range(num_fixed_rows + 1, table_start_row):
         for col_idx in (7, 8, 9):
             ws.cell(row=row_idx, column=col_idx).border = _NO_BORDER
     for row_offset, row in enumerate(table_part):
@@ -462,7 +474,7 @@ def write_spreadsheet(
             c = ws.cell(row=row_idx, column=col_idx)
             if row_offset == 0 and isinstance(cell, str) and "\n" in cell:
                 c.value = cell
-                c.alignment = Alignment(wrap_text=True)
+                c.alignment = Alignment(horizontal="center", wrap_text=True)
             elif venci_col_0based is not None and (col_idx - 1) == venci_col_0based:
                 val = _parse_date(cell)
                 c.value = val
@@ -484,7 +496,7 @@ def write_spreadsheet(
                     else:
                         c.number_format = "0.00"
 
-    # Style table: all borders; first row (header) and last row (totals) bold + light gray
+    # Style table: all borders; first row (header) and last row (totals) bold + light gray; all table cells centered
     num_table_cols = len(table_part[0]) if table_part else 0
     num_table_rows = len(table_part) if table_part else 0
     for row_offset in range(num_table_rows):
@@ -494,6 +506,11 @@ def write_spreadsheet(
         for col_idx in range(1, num_table_cols + 1):
             c = ws.cell(row=row_idx, column=col_idx)
             c.border = _THIN_BORDER
+            # Center alignment for whole table (preserve wrap_text if set)
+            c.alignment = Alignment(
+                horizontal="center",
+                wrap_text=getattr(c.alignment, "wrap_text", False),
+            )
             if is_first_row:
                 c.font = _BOLD_FONT
                 c.fill = _LIGHT_GRAY_FILL

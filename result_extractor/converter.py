@@ -5,6 +5,13 @@ import unicodedata
 from pathlib import Path
 
 from .config import COLUMNS_TO_EXCLUDE, HAS_HEADER_ROW, OUTPUT_COLUMN_ORDER
+from .excel_writer import (
+    CONDOMINIOS_FIXED_TABLE_ROWS,
+    IMOBILIARIAS_FIXED_TABLE_ROWS,
+    write_xlsx,
+    write_spreadsheet,
+)
+from .pdf_reader import extract_tables, extract_header_and_tables
 
 # Brazilian date pattern in header (e.g. "Joinville, 09 de Março de 2026" or "09 de Março de 2026")
 _DATE_HEADER_PATTERN = re.compile(
@@ -28,8 +35,6 @@ def _normalize_header(name: str) -> str:
     s = re.sub(r"\s+", " ", str(name).strip()).upper()
     nfd = unicodedata.normalize("NFD", s)
     return "".join(c for c in nfd if unicodedata.category(c) != "Mn")
-from .excel_writer import write_xlsx, write_spreadsheet
-from .pdf_reader import extract_tables, extract_header_and_tables
 
 
 def _cell_to_float(cell) -> float:
@@ -347,7 +352,7 @@ def convert_pdf_to_spreadsheet(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    out_path = output_dir / f"exported_{timestamp}.xlsx"
+    out_path = output_dir / f"exported_condominios_{timestamp}.xlsx"
 
     # 12) Write once, outside any page loop
     return write_spreadsheet(
@@ -356,4 +361,91 @@ def convert_pdf_to_spreadsheet(
         out_path,
         column_order=order if order else None,
         has_header=header_flag,
+        fixed_table_rows=CONDOMINIOS_FIXED_TABLE_ROWS,
+    )
+
+
+def convert_pdf_to_spreadsheet_imobiliarias(
+    pdf_path: str | Path,
+    output_dir: str | Path | None = None,
+) -> Path:
+    """
+    IMOBILIÁRIAS operation: no HR/HA; HONORÁRIOS from PDF kept as "HONORÁRIOS".
+
+    PDF columns: ESPÉCIE, TÍTULO, VENCIMENTO, ATRASO, VALOR, CORREÇÃO MONETÁRIA,
+    JUROS, MULTA, HONORÁRIOS, TOTAL. Excludes TÍTULO and ATRASO. Adds only VCM
+    (VALOR + CORREÇÃO MONETÁRIA); HONORÁRIOS is kept with header "HONORÁRIOS"
+    (no 20% calculation). Output: exported_imobiliarias_<timestamp>.xlsx.
+    """
+    from datetime import datetime
+
+    columns_to_exclude = ["TÍTULO", "ATRASO"]
+    # No TAXAS RESULT or HR/HA; column stays "HONORÁRIOS" (imobiliárias context)
+    column_order: list[str] = [
+        "ESPÉCIE",
+        "VENCIMENTO",
+        "VALOR",
+        "VALOR CORRIGIDO",
+        "JUROS",
+        "MULTA",
+        "HONORÁRIOS",
+        "TOTAL",
+    ]
+    has_header = True
+
+    pdf_path = Path(pdf_path)
+    if not pdf_path.exists():
+        raise FileNotFoundError(f"PDF not found: {pdf_path}")
+
+    all_header_rows, all_tables = extract_header_and_tables(pdf_path)
+    all_header_rows = [r for r in all_header_rows if not _is_date_header_row(r)]
+
+    combined_table_rows: list[list[str]] = []
+    if all_tables:
+        first_header = all_tables[0][0] if (all_tables[0]) else []
+        combined_table_rows.append(first_header)
+        for t in all_tables:
+            data_start = 1 if (t and t[0] == first_header) else 0
+            for row in t[data_start:]:
+                combined_table_rows.append(row)
+
+    # Drop TÍTULO, ATRASO
+    if combined_table_rows and columns_to_exclude:
+        header_row = combined_table_rows[0]
+        exclude_set = {c.strip() for c in columns_to_exclude}
+        keep_indices = [i for i, h in enumerate(header_row) if str(h).strip() not in exclude_set]
+        combined_table_rows = [[(row[i] if i < len(row) else "") for i in keep_indices] for row in combined_table_rows]
+
+    # Only VCM (no HR, HA)
+    combined_table_rows = _add_blank_columns(
+        combined_table_rows,
+        [(["CORREÇÃO MONETÁRIA", "Correção", "VALOR"], "VCM")],
+    )
+    combined_table_rows = _fill_vcm_column(combined_table_rows)
+    # Drop only CORREÇÃO MONETÁRIA; keep HONORÁRIOS (display as "HONORÁRIOS" in imobiliárias)
+    combined_table_rows = _drop_columns(
+        combined_table_rows,
+        ["CORREÇÃO MONETÁRIA", "Correção"],
+    )
+    # VCM -> VALOR CORRIGIDO; HONORÁRIOS stays "HONORÁRIOS" (no rename)
+    combined_table_rows = _rename_header_columns(
+        combined_table_rows,
+        {"VCM": "VALOR CORRIGIDO"},
+    )
+    combined_table_rows = _fill_column_with_value(combined_table_rows, "ESPÉCIE", "COTA")
+
+    if output_dir is None:
+        output_dir = Path.home() / "Desktop"
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    out_path = output_dir / f"exported_imobiliarias_{timestamp}.xlsx"
+
+    return write_spreadsheet(
+        all_header_rows,
+        combined_table_rows,
+        out_path,
+        column_order=column_order,
+        has_header=has_header,
+        fixed_table_rows=IMOBILIARIAS_FIXED_TABLE_ROWS,
     )

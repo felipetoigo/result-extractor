@@ -39,6 +39,7 @@ Thumbs.db
 # Project-specific
 *.pdf
 *.xlsx
+output/
 !tests/fixtures/*.pdf
 !tests/fixtures/*.xlsx
 
