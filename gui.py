@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-from result_extractor.converter import convert_pdf_to_spreadsheet
+from result_extractor.converter import convert_pdf_to_spreadsheet, convert_pdf_to_spreadsheet_imobiliarias
 
 
 def get_desktop_path() -> Path:
@@ -54,9 +54,32 @@ def import_and_convert() -> None:
 
 
 def imobiliarias_import_and_convert() -> None:
-    """IMOBILIÁRIAS flow: import PDF and convert (rules to be defined)."""
-    # TODO: define and implement IMOBILIÁRIAS-specific rules
-    pass
+    """IMOBILIÁRIAS flow: select PDF, exclude TÍTULO/ATRASO, same extraction pattern as condomínios."""
+    pdf_dir = get_pdf_to_convert_dir()
+    initial_dir = str(pdf_dir) if pdf_dir.is_dir() else None
+    pdf_path = filedialog.askopenfilename(
+        title="Select PDF file (Imobiliárias)",
+        initialdir=initial_dir,
+        filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
+    )
+    if not pdf_path:
+        return
+
+    desktop = get_desktop_path()
+    desktop.mkdir(parents=True, exist_ok=True)
+
+    try:
+        out_path = convert_pdf_to_spreadsheet_imobiliarias(pdf_path, output_dir=desktop)
+        messagebox.showinfo(
+            "Done",
+            f"File saved to:\n{out_path}",
+        )
+    except FileNotFoundError as e:
+        messagebox.showerror("Error", str(e))
+    except ValueError as e:
+        messagebox.showerror("Error", str(e))
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
 
 
 def main() -> None:
