@@ -35,7 +35,7 @@ A Python application that extracts structured data from PDFs containing **header
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/result-extractor.git
+git clone https://github.com/felipetoigo/result-extractor.git
 cd result-extractor
 ```
 
@@ -260,7 +260,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Contact
 
-Your Name - [GitHub](https://github.com/yourusername)
+Felipe Toigo - [GitHub](https://github.com/felipetoigo)
 
 ---
 
