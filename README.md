@@ -260,7 +260,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Contact
 
-Your Name - [GitHub](https://github.com/yourusername)
+Felipe Toigo - [GitHub](https://github.com/felipetoigo)
 
 ---
 
