@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-lightgrey.svg)]()
 
-A Python application that extracts structured data from PDFs containing **header sections + data tables** and converts them into **clean Excel spreadsheets** with customizable column ordering. Perfect for extracting data from invoices, reports, or forms.
+A Python application that extracts structured data from a specific PDFs model containing **header sections + data tables** and converts them into **clean Excel spreadsheets**, created for a specific work situation.
 
 ## ✨ Features
 
